@@ -1,7 +1,6 @@
 import json
 import os
 import threading
-import time
 
 import cv2
 from fastapi import FastAPI, Request
@@ -12,7 +11,9 @@ from fastapi.templating import Jinja2Templates
 from services.logging_config import setup_logging, get_logger
 from services.schemas import ChatRequest
 from services.event_repository import init_db, list_events
+from services.config import AGENT_EVENT_LIMIT
 from services.video_monitor import VideoMonitor
+from services.chat_session_service import ChatSessionService
 import services.monitoring_agent as agent
 import services.ollama_client as ollama_client
 import services.camera_pool as camera_pool
@@ -33,9 +34,8 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 monitor = VideoMonitor()
-
-# Histórico em memória (sessão única — demo de sala de aula)
-_chat_history: list = []
+chat_sessions = ChatSessionService()
+SESSION_ID = "default"  # single-user por enquanto
 
 
 # ---------------------------------------------------------------------------
@@ -109,26 +109,10 @@ def get_frame():
     return Response(content=buffer.tobytes(), media_type="image/jpeg")
 
 
-def _mjpeg_generator():
-    while True:
-        frame = monitor.get_last_frame()
-        if frame is None:
-            time.sleep(0.1)
-            continue
-        success, buffer = cv2.imencode(".jpg", frame)
-        if not success:
-            continue
-        yield (
-            b"--frame\r\n"
-            b"Content-Type: image/jpeg\r\n\r\n" + buffer.tobytes() + b"\r\n"
-        )
-        time.sleep(0.05)
-
-
 @app.get("/video_feed")
 def video_feed():
     return StreamingResponse(
-        _mjpeg_generator(),
+        monitor.iter_mjpeg(),
         media_type="multipart/x-mixed-replace; boundary=frame",
     )
 
@@ -144,13 +128,12 @@ def stream():
 # ---------------------------------------------------------------------------
 @app.post("/chat")
 def chat(body: ChatRequest):
-    global _chat_history
     try:
-        answer = agent.ask(body.message, _chat_history)
-        _chat_history.append({"role": "user", "content": body.message})
-        _chat_history.append({"role": "assistant", "content": answer})
-        if len(_chat_history) > 16:
-            _chat_history = _chat_history[-16:]
+        events = list_events(AGENT_EVENT_LIMIT)
+        history = chat_sessions.get(SESSION_ID)
+        answer = agent.ask(body.message, history, events)
+        chat_sessions.append(SESSION_ID, "user", body.message)
+        chat_sessions.append(SESSION_ID, "assistant", answer)
         return {"answer": answer}
     except RuntimeError as exc:
         log.warning("Falha controlada no /chat: %s", exc)
@@ -167,21 +150,20 @@ def chat(body: ChatRequest):
 
 @app.post("/chat/stream")
 def chat_stream(body: ChatRequest):
-    global _chat_history
-
     def generate():
         accumulated: list[str] = []
         try:
-            for chunk in agent.ask_stream(body.message, _chat_history):
+            events = list_events(AGENT_EVENT_LIMIT)
+            history = chat_sessions.get(SESSION_ID)
+            for chunk in agent.ask_stream(body.message, history, events):
                 accumulated.append(chunk)
                 yield json.dumps({"chunk": chunk}, ensure_ascii=False) + "\n"
             full_response = "".join(accumulated)
-            _chat_history.append({"role": "user", "content": body.message})
-            _chat_history.append({"role": "assistant", "content": full_response})
-            if len(_chat_history) > 16:
-                del _chat_history[:-16]
+            chat_sessions.append(SESSION_ID, "user", body.message)
+            chat_sessions.append(SESSION_ID, "assistant", full_response)
             yield json.dumps({"done": True}) + "\n"
         except RuntimeError as exc:
+            log.warning("Falha controlada no /chat/stream: %s", exc)
             yield json.dumps({"error": str(exc)}, ensure_ascii=False) + "\n"
         except Exception:
             log.exception("Erro inesperado no /chat/stream")

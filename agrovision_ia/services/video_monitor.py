@@ -5,7 +5,6 @@ import uuid
 import threading
 from datetime import datetime
 from collections import defaultdict
-from ultralytics import YOLO
 
 from services.config import (
     CAMERA_SOURCE, MODEL_PATH, CONFIDENCE_THRESHOLD, SAVE_DIR,
@@ -15,6 +14,7 @@ from services.config import (
 import services.camera_pool as camera_pool
 from services.event_repository import save_event
 from services.logging_config import get_logger
+from services.detector import ObjectDetector, Detection
 
 log = get_logger("agrovision.video")
 
@@ -29,6 +29,7 @@ class VideoMonitor:
         self._last_alert_time: dict = defaultdict(float)
         # Fonte ativa; definida em _run() — pode ser URL do pool ou override do .env
         self._active_source: str | int | None = CAMERA_SOURCE
+        self._detector = ObjectDetector(MODEL_PATH, CONFIDENCE_THRESHOLD, TARGET_CLASSES)
 
     def start(self):
         self._running = True
@@ -63,8 +64,23 @@ class VideoMonitor:
             return True
         return False
 
+    def iter_mjpeg(self):
+        while self._running:
+            frame = self.get_last_frame()
+            if frame is None:
+                time.sleep(0.1)
+                continue
+            success, buffer = cv2.imencode(".jpg", frame)
+            if not success:
+                continue
+            yield (
+                b"--frame\r\n"
+                b"Content-Type: image/jpeg\r\n\r\n"
+                + buffer.tobytes() + b"\r\n"
+            )
+            time.sleep(0.05)
+
     def _run(self):
-        model = YOLO(MODEL_PATH)
         os.makedirs(SAVE_DIR, exist_ok=True)
         if CAMERA_SOURCE is None:
             self._active_source = camera_pool.pick_random()
@@ -73,12 +89,12 @@ class VideoMonitor:
             self._active_source = CAMERA_SOURCE
         while self._running:
             try:
-                self._capture_loop(model)
+                self._capture_loop()
             except Exception:
                 log.exception("VideoMonitor: erro inesperado, reiniciando em 5s")
                 time.sleep(5)
 
-    def _capture_loop(self, model):
+    def _capture_loop(self):
         consecutive_failures = 0
 
         while self._running:
@@ -112,26 +128,21 @@ class VideoMonitor:
                     time.sleep(CAMERA_RECONNECT_SECONDS)
                     break
 
-                results = model(frame, conf=CONFIDENCE_THRESHOLD, verbose=False)[0]
+                detections = self._detector.detect(frame)
                 current_labels: set = set()
-                frame_best_conf: dict = defaultdict(float)
+                frame_best_conf: dict[str, float] = defaultdict(float)
 
-                for box in results.boxes:
-                    cls_id = int(box.cls[0])
-                    label = model.names[cls_id]
-                    if label not in TARGET_CLASSES:
-                        continue
-                    conf = float(box.conf[0])
-                    x1, y1, x2, y2 = map(int, box.xyxy[0])
+                for det in detections:
+                    x1, y1, x2, y2 = det.bbox
                     cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
                     cv2.putText(
-                        frame, f"{label} {conf:.0%}",
+                        frame, f"{det.label} {det.confidence:.0%}",
                         (x1, max(20, y1 - 8)),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2,
                     )
-                    current_labels.add(label)
-                    if conf > frame_best_conf[label]:
-                        frame_best_conf[label] = conf
+                    current_labels.add(det.label)
+                    if det.confidence > frame_best_conf[det.label]:
+                        frame_best_conf[det.label] = det.confidence
 
                 for label in list(self._detection_state.keys()):
                     if label not in current_labels:

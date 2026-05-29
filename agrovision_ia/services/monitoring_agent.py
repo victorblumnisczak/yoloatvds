@@ -2,8 +2,6 @@ from dataclasses import dataclass
 from collections import Counter
 from typing import Iterator
 
-from services.config import AGENT_EVENT_LIMIT
-from services.event_repository import list_events
 import services.ollama_client as ollama_client
 
 MAX_HISTORY_MESSAGES = 8
@@ -79,19 +77,19 @@ def build_agent_messages(question: str, history: list, events: list) -> list:
     ]
 
 
-def ask(question: str, history: list | None = None) -> str:
-    events = list_events(AGENT_EVENT_LIMIT)
+def ask(question: str, history: list | None, events: list) -> str:
     messages = build_agent_messages(question, history or [], events)
     return ollama_client.chat(messages)
 
 
-def ask_stream(question: str, history: list | None = None) -> Iterator[str]:
-    events = list_events(AGENT_EVENT_LIMIT)
+def ask_stream(question: str, history: list | None, events: list) -> Iterator[str]:
     messages = build_agent_messages(question, history or [], events)
     return ollama_client.chat_stream(messages)
 
 
 def get_status() -> dict:
+    from services.event_repository import list_events
+    from services.config import AGENT_EVENT_LIMIT
     events = list_events(AGENT_EVENT_LIMIT)
     return {
         "name": AGENT_PROFILE.name,
