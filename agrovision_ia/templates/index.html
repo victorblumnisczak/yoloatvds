@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AgroVision AI — Monitoramento Rural</title>
+  <link rel="stylesheet" href="/static/dashboard.css" />
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>AgroVision AI</h1>
+    <span>Monitoramento Rural com Visão Computacional</span>
+  </div>
+  <div class="badge" id="status-badge">● ONLINE</div>
+</header>
+
+<main>
+
+  <!-- Feed da câmera -->
+  <div>
+    <div class="feed-card">
+      <h2>Feed ao vivo</h2>
+      <img src="/video_feed" alt="Feed ao vivo da câmera" id="camera-feed"
+           onerror="this.src='/frame'; this.onerror=null;" />
+    </div>
+  </div>
+
+  <!-- Coluna direita -->
+  <div class="right-col">
+
+    <!-- Tabela de eventos -->
+    <div class="events-card">
+      <div class="card-header">
+        Últimos eventos
+        <small id="refresh-hint">atualiza a cada 10s</small>
+      </div>
+      <div class="events-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Horário</th>
+              <th>Classe</th>
+              <th>Conf.</th>
+              <th>Imagem</th>
+            </tr>
+          </thead>
+          <tbody id="events-body">
+            {% if events %}
+              {% for e in events %}
+              <tr>
+                <td>{{ e.event_time }}</td>
+                <td><span class="label-badge label-{{ e.label }}">{{ e.label }}</span></td>
+                <td class="conf">{{ "%.0f%%"|format(e.confidence * 100) }}</td>
+                <td>
+                  <a href="{{ e.image_path }}" target="_blank"
+                     style="color:#60a5fa;font-size:.75rem;">ver</a>
+                </td>
+              </tr>
+              {% endfor %}
+            {% else %}
+              <tr><td colspan="4" class="no-events">Nenhum evento registrado ainda.</td></tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Chat -->
+    <div class="chat-card">
+      <div class="card-header">Agente AgroVision</div>
+      <div class="chat-messages" id="chat-messages">
+        <div class="msg msg-bot">
+          Olá! Sou o Agente AgroVision, responsável pela triagem operacional de eventos. Pergunte sobre os eventos detectados, riscos e próximas ações.
+        </div>
+      </div>
+      <form class="chat-form" id="chat-form">
+        <input type="text" id="chat-input" placeholder="Ex: Avalie o risco e recomende a próxima ação..."
+               autocomplete="off" required />
+        <button type="submit" id="chat-btn">Enviar</button>
+      </form>
+    </div>
+
+  </div>
+</main>
+
+<script src="/static/dashboard.js"></script>
+</body>
+</html>

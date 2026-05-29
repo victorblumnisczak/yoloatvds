@@ -1,0 +1,21 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+.env.local
+*.db
+*.sqlite3
+detections.db
+scraping_cache.db
+static/captures/
+yolov8n.pt
+*.log
+.pytest_cache/
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Documentacao de trabalho interna (Atividade 2) -- nao publicar
+orgprompts/
