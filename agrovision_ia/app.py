@@ -1,6 +1,7 @@
 import json
 import os
 import threading
+from typing import Literal
 
 import cv2
 from fastapi import FastAPI, Request
@@ -11,9 +12,14 @@ from fastapi.templating import Jinja2Templates
 from services.logging_config import setup_logging, get_logger
 from services.schemas import ChatRequest
 from services.event_repository import init_db, list_events
-from services.config import AGENT_EVENT_LIMIT
+from services.config import (
+    AGENT_EVENT_LIMIT, SCRAPING_ENABLED, SCRAPING_MIN_INTERVAL, SCRAPING_CACHE_DB
+)
 from services.video_monitor import VideoMonitor
 from services.chat_session_service import ChatSessionService
+from services.scraping.cache import ScrapingCache
+from services.scraping.rate_limiter import RateLimiter
+from services.scraping.scraping_service import ScrapingService
 import services.monitoring_agent as agent
 import services.ollama_client as ollama_client
 import services.camera_pool as camera_pool
@@ -37,6 +43,10 @@ monitor = VideoMonitor()
 chat_sessions = ChatSessionService()
 SESSION_ID = "default"  # single-user por enquanto
 
+_scraping_cache = ScrapingCache(SCRAPING_CACHE_DB)
+_rate_limiter = RateLimiter(SCRAPING_MIN_INTERVAL)
+scraping_service = ScrapingService(sources=[], cache=_scraping_cache, rate_limiter=_rate_limiter)
+
 
 # ---------------------------------------------------------------------------
 # Startup
@@ -47,6 +57,15 @@ def startup():
     monitor.start()
     log.info("Warmup do Ollama disparado em background.")
     threading.Thread(target=ollama_client.warmup, daemon=True).start()
+    if SCRAPING_ENABLED:
+        threading.Thread(
+            target=scraping_service.background_refresh_loop,
+            kwargs={"interval_seconds": 60},
+            daemon=True,
+        ).start()
+        log.info("ScrapingService inicializado.")
+    else:
+        log.info("Scraping desabilitado por configuração (.env).")
 
 
 # ---------------------------------------------------------------------------
@@ -86,6 +105,13 @@ def agent_status():
 @app.get("/ollama/status")
 def ollama_status():
     return ollama_client.is_alive()
+
+
+@app.get("/scraping/status")
+def scraping_status():
+    if not SCRAPING_ENABLED:
+        return {"enabled": False, "sources": [], "cache": {"total": 0, "by_source": {}}}
+    return scraping_service.status()
 
 
 # ---------------------------------------------------------------------------

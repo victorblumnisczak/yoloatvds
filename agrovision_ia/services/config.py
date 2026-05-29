@@ -27,3 +27,28 @@ DB_PATH = "detections.db"
 TARGET_CLASSES = {"person", "car", "motorcycle", "truck", "bus"}
 MIN_CONSECUTIVE_FRAMES = 3
 ALERT_COOLDOWN_SECONDS = 20
+
+# === Scraping ===
+SCRAPING_ENABLED = os.getenv("SCRAPING_ENABLED", "true").lower() == "true"
+SCRAPING_USER_AGENT = os.getenv("SCRAPING_USER_AGENT", "AgroVisionAI-Educational/1.0")
+SCRAPING_TIMEOUT = int(os.getenv("SCRAPING_TIMEOUT", "10"))
+SCRAPING_MIN_INTERVAL = int(os.getenv("SCRAPING_MIN_INTERVAL", "30"))
+SCRAPING_WEATHER_TTL = int(os.getenv("SCRAPING_WEATHER_TTL", "600"))
+SCRAPING_MARKET_TTL = int(os.getenv("SCRAPING_MARKET_TTL", "3600"))
+SCRAPING_NEWS_TTL = int(os.getenv("SCRAPING_NEWS_TTL", "1800"))
+
+
+def _parse_float(v: str | None) -> float | None:
+    if not v:
+        return None
+    try:
+        return float(v.replace(",", "."))
+    except ValueError:
+        return None
+
+
+SCRAPING_LAT = _parse_float(os.getenv("SCRAPING_LAT"))
+SCRAPING_LON = _parse_float(os.getenv("SCRAPING_LON"))
+SCRAPING_PLACE_NAME = os.getenv("SCRAPING_PLACE_NAME") or None
+
+SCRAPING_CACHE_DB = "scraping_cache.db"
