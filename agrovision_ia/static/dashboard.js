@@ -127,5 +127,6 @@ async function checkHealth() {
   }
 }
 
+refreshEvents();   // carga inicial em vez do render do Jinja
 checkHealth();
 setInterval(checkHealth, 30000);

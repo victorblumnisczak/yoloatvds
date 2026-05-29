@@ -1,6 +1,7 @@
+import os
 import random
 
-CAMERAS_POOL: list[str] = [
+_FALLBACK_DEFAULTS = [
     # Distrito 11 — San Diego / fronteira México
     "https://wzmedia.dot.ca.gov/D11/C214_SB_5_at_Via_De_San_Ysidro.stream/playlist.m3u8",
     # Distrito 4 — Bay Area
@@ -13,6 +14,12 @@ CAMERAS_POOL: list[str] = [
     # Distrito 7 — Los Angeles
     "https://wzmedia.dot.ca.gov/D7/N101_AT_VINELAND.stream/playlist.m3u8",
 ]
+
+_pool_env = os.getenv("CAMERA_POOL", "").strip()
+if _pool_env:
+    CAMERAS_POOL: list[str] = [u.strip() for u in _pool_env.split(",") if u.strip()]
+else:
+    CAMERAS_POOL = list(_FALLBACK_DEFAULTS)
 
 
 def pick_random() -> str:

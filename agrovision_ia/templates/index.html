@@ -47,21 +47,7 @@
             </tr>
           </thead>
           <tbody id="events-body">
-            {% if events %}
-              {% for e in events %}
-              <tr>
-                <td>{{ e.event_time }}</td>
-                <td><span class="label-badge label-{{ e.label }}">{{ e.label }}</span></td>
-                <td class="conf">{{ "%.0f%%"|format(e.confidence * 100) }}</td>
-                <td>
-                  <a href="{{ e.image_path }}" target="_blank"
-                     style="color:#60a5fa;font-size:.75rem;">ver</a>
-                </td>
-              </tr>
-              {% endfor %}
-            {% else %}
-              <tr><td colspan="4" class="no-events">Nenhum evento registrado ainda.</td></tr>
-            {% endif %}
+            <tr><td colspan="4" class="no-events">Carregando eventos...</td></tr>
           </tbody>
         </table>
       </div>

@@ -54,10 +54,7 @@ def startup():
 # ---------------------------------------------------------------------------
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
-    events = list_events(20)
-    return templates.TemplateResponse(
-        "index.html", {"request": request, "events": events}
-    )
+    return templates.TemplateResponse("index.html", {"request": request})
 
 
 @app.get("/health")
