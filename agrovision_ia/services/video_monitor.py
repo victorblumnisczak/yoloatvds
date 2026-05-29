@@ -14,6 +14,9 @@ from services.config import (
 )
 import services.camera_pool as camera_pool
 from services.event_repository import save_event
+from services.logging_config import get_logger
+
+log = get_logger("agrovision.video")
 
 
 class VideoMonitor:
@@ -63,44 +66,48 @@ class VideoMonitor:
     def _run(self):
         model = YOLO(MODEL_PATH)
         os.makedirs(SAVE_DIR, exist_ok=True)
-
         if CAMERA_SOURCE is None:
             self._active_source = camera_pool.pick_random()
-            print(f"[VideoMonitor] Pool ativo. Câmera selecionada: {self._active_source}")
+            log.info("Pool ativo. Câmera selecionada: %s", self._active_source)
         else:
             self._active_source = CAMERA_SOURCE
+        while self._running:
+            try:
+                self._capture_loop(model)
+            except Exception:
+                log.exception("VideoMonitor: erro inesperado, reiniciando em 5s")
+                time.sleep(5)
 
+    def _capture_loop(self, model):
         consecutive_failures = 0
 
         while self._running:
             cap = cv2.VideoCapture(self._active_source)
             if not cap.isOpened():
                 consecutive_failures += 1
-                print(
-                    f"[VideoMonitor] Falha ao abrir '{self._active_source}' "
-                    f"({consecutive_failures}/3). "
-                    f"Tentando novamente em {CAMERA_RECONNECT_SECONDS}s..."
+                log.warning(
+                    "Falha ao abrir '%s' (%d/3). Tentando novamente em %ds...",
+                    self._active_source, consecutive_failures, CAMERA_RECONNECT_SECONDS,
                 )
                 if CAMERA_SOURCE is None and consecutive_failures >= 3:
                     self._active_source = camera_pool.next_after_failure(
                         str(self._active_source)
                     )
                     consecutive_failures = 0
-                    print(f"[VideoMonitor] Trocando para câmera do pool: {self._active_source}")
+                    log.info("Trocando para câmera do pool: %s", self._active_source)
                 time.sleep(CAMERA_RECONNECT_SECONDS)
                 continue
 
             consecutive_failures = 0
             self._connected = True
-            print(f"[VideoMonitor] Câmera conectada: {self._active_source}")
+            log.info("Câmera conectada: %s", self._active_source)
 
             while self._running:
                 ret, frame = cap.read()
                 if not ret:
                     self._connected = False
-                    print(
-                        f"[VideoMonitor] Stream perdido. "
-                        f"Reconectando em {CAMERA_RECONNECT_SECONDS}s..."
+                    log.warning(
+                        "Stream perdido. Reconectando em %ds...", CAMERA_RECONNECT_SECONDS
                     )
                     time.sleep(CAMERA_RECONNECT_SECONDS)
                     break
@@ -144,7 +151,7 @@ class VideoMonitor:
                         cv2.imwrite(img_path, frame)
                         save_event(label, conf, f"/static/captures/{img_filename}")
                         self._detection_state[label] = 0
-                        print(f"[VideoMonitor] Alerta: {label} conf={conf:.2f}")
+                        log.info("Alerta: %s conf=%.2f", label, conf)
 
                 with self._lock:
                     self._last_frame = frame.copy()

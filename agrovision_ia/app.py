@@ -9,12 +9,16 @@ from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, Res
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from services.logging_config import setup_logging, get_logger
 from services.schemas import ChatRequest
 from services.event_repository import init_db, list_events
 from services.video_monitor import VideoMonitor
 import services.monitoring_agent as agent
 import services.ollama_client as ollama_client
 import services.camera_pool as camera_pool
+
+setup_logging()
+log = get_logger("agrovision.app")
 
 # ---------------------------------------------------------------------------
 # App
@@ -41,7 +45,7 @@ _chat_history: list = []
 def startup():
     init_db()
     monitor.start()
-    print("[startup] Warmup do Ollama disparado em background.")
+    log.info("Warmup do Ollama disparado em background.")
     threading.Thread(target=ollama_client.warmup, daemon=True).start()
 
 
@@ -149,8 +153,10 @@ def chat(body: ChatRequest):
             _chat_history = _chat_history[-16:]
         return {"answer": answer}
     except RuntimeError as exc:
+        log.warning("Falha controlada no /chat: %s", exc)
         return {"answer": str(exc)}
     except Exception:
+        log.exception("Erro inesperado no /chat")
         return {
             "answer": (
                 "Não foi possível consultar o agente no momento. "
@@ -177,10 +183,8 @@ def chat_stream(body: ChatRequest):
             yield json.dumps({"done": True}) + "\n"
         except RuntimeError as exc:
             yield json.dumps({"error": str(exc)}, ensure_ascii=False) + "\n"
-        except Exception as e:
-            import traceback
-            print(f"[chat/stream] ERRO: {type(e).__name__}: {e}")
-            traceback.print_exc()
+        except Exception:
+            log.exception("Erro inesperado no /chat/stream")
             yield json.dumps(
                 {"error": "Não foi possível consultar o agente no momento."},
                 ensure_ascii=False,

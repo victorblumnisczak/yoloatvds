@@ -4,6 +4,9 @@ from typing import Iterator
 import httpx
 
 from services.config import OLLAMA_URL, OLLAMA_MODEL, OLLAMA_TIMEOUT, OLLAMA_KEEP_ALIVE
+from services.logging_config import get_logger
+
+log = get_logger("agrovision.ollama")
 
 
 def chat(messages: list) -> str:
@@ -79,9 +82,9 @@ def warmup():
                     "keep_alive": OLLAMA_KEEP_ALIVE,
                 },
             )
-        print("[ollama] Warmup concluído.")
+        log.info("Warmup concluído.")
     except Exception as e:
-        print(f"[ollama] Warmup falhou silenciosamente: {e}")
+        log.warning("Warmup falhou silenciosamente: %s", e)
 
 
 def is_alive() -> dict:
