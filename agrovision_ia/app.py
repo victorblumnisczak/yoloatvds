@@ -20,6 +20,7 @@ from services.chat_session_service import ChatSessionService
 from services.scraping.cache import ScrapingCache
 from services.scraping.rate_limiter import RateLimiter
 from services.scraping.scraping_service import ScrapingService
+from services.scraping.weather import WeatherSource
 import services.monitoring_agent as agent
 import services.ollama_client as ollama_client
 import services.camera_pool as camera_pool
@@ -45,7 +46,14 @@ SESSION_ID = "default"  # single-user por enquanto
 
 _scraping_cache = ScrapingCache(SCRAPING_CACHE_DB)
 _rate_limiter = RateLimiter(SCRAPING_MIN_INTERVAL)
-scraping_service = ScrapingService(sources=[], cache=_scraping_cache, rate_limiter=_rate_limiter)
+_weather_source = WeatherSource(
+    active_camera_provider=lambda: monitor.status().get("source")
+)
+scraping_service = ScrapingService(
+    sources=[_weather_source],
+    cache=_scraping_cache,
+    rate_limiter=_rate_limiter,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -112,6 +120,16 @@ def scraping_status():
     if not SCRAPING_ENABLED:
         return {"enabled": False, "sources": [], "cache": {"total": 0, "by_source": {}}}
     return scraping_service.status()
+
+
+@app.get("/scraping/weather")
+def scraping_weather():
+    if not SCRAPING_ENABLED:
+        return JSONResponse(status_code=503, content={"error": "scraping desabilitado"})
+    result = scraping_service.get("weather")
+    if not result:
+        return JSONResponse(status_code=503, content={"error": "indisponível"})
+    return result.payload
 
 
 # ---------------------------------------------------------------------------
