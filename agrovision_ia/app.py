@@ -127,6 +127,16 @@ def scraping_status():
     return scraping_service.status()
 
 
+@app.post("/scraping/refresh")
+def scraping_refresh(source: Literal["weather", "market", "news"]):
+    if not SCRAPING_ENABLED:
+        return JSONResponse(status_code=503, content={"error": "scraping desabilitado"})
+    result = scraping_service.get(source, force=True)
+    if not result:
+        return JSONResponse(status_code=503, content={"error": "falha ao refrescar"})
+    return result.payload
+
+
 @app.get("/scraping/news")
 def scraping_news():
     if not SCRAPING_ENABLED:
