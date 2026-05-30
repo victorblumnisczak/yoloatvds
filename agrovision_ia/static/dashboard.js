@@ -130,3 +130,75 @@ async function checkHealth() {
 refreshEvents();   // carga inicial em vez do render do Jinja
 checkHealth();
 setInterval(checkHealth, 30000);
+
+// --- Condições externas (clima + cotações via scraping) ---
+async function refreshExternal() {
+  try {
+    const [wRes, mRes] = await Promise.allSettled([
+      fetch('/scraping/weather'),
+      fetch('/scraping/market'),
+    ]);
+
+    const wEl = document.getElementById('weather-content');
+    if (wRes.status === 'fulfilled' && wRes.value.ok) {
+      const w = await wRes.value.json();
+      wEl.innerHTML = '';
+      const line = document.createElement('div');
+      line.className = 'weather-line';
+      const temp = document.createElement('span');
+      temp.className = 'temp';
+      temp.textContent = `${Math.round(w.temperature_c ?? 0)}°C`;
+      line.appendChild(temp);
+      line.appendChild(document.createTextNode(
+        `${w.weather_description || ''} — ${w.location || ''} | vento ${Math.round(w.wind_kmh || 0)} km/h`
+      ));
+      wEl.appendChild(line);
+    } else {
+      wEl.innerHTML = '<span class="muted">Indisponível.</span>';
+    }
+
+    const mEl = document.getElementById('market-content');
+    if (mRes.status === 'fulfilled' && mRes.value.ok) {
+      const m = await mRes.value.json();
+      mEl.innerHTML = '';
+      (m.quotes || []).slice(0, 5).forEach(q => {
+        const row = document.createElement('div');
+        row.className = 'quote-line';
+
+        const name = document.createElement('span');
+        name.textContent = q.product;
+
+        const val = document.createElement('span');
+        const variation = q.variation_pct;
+        const price = q.price_brl;
+        const priceStr = typeof price === 'number' ? price.toFixed(2) : '?';
+
+        // Constrói via DOM (não usar innerHTML em dados externos)
+        const priceText = document.createTextNode(`R$ ${priceStr}/${q.unit || ''} `);
+        val.appendChild(priceText);
+
+        if (typeof variation === 'number') {
+          const varSpan = document.createElement('span');
+          varSpan.className = variation >= 0 ? 'var-up' : 'var-down';
+          varSpan.textContent = `(${variation >= 0 ? '+' : ''}${variation.toFixed(1)}%)`;
+          val.appendChild(varSpan);
+        }
+
+        row.appendChild(name);
+        row.appendChild(val);
+        mEl.appendChild(row);
+      });
+      if (!mEl.children.length) {
+        mEl.innerHTML = '<span class="muted">Sem cotações.</span>';
+      }
+    } else {
+      mEl.innerHTML = '<span class="muted">Indisponível.</span>';
+    }
+  } catch (_) {
+    document.getElementById('weather-content').innerHTML = '<span class="muted">Erro de rede.</span>';
+    document.getElementById('market-content').innerHTML = '<span class="muted">Erro de rede.</span>';
+  }
+}
+
+refreshExternal();
+setInterval(refreshExternal, 5 * 60 * 1000); // 5 minutos

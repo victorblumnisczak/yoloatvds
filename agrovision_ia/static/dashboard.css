@@ -205,6 +205,54 @@ tr:hover td { background: #232a3a; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
 
+/* ---- External conditions card ---- */
+.external-card {
+  background: #1e2330;
+  border-radius: 12px;
+  border: 1px solid #2d3748;
+  overflow: hidden;
+}
+.external-body {
+  padding: .8rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: .9rem;
+}
+.external-section h3 {
+  font-size: .72rem;
+  text-transform: uppercase;
+  color: #64748b;
+  letter-spacing: .08em;
+  margin-bottom: .35rem;
+}
+.external-section .weather-line {
+  color: #e2e8f0;
+  font-size: .92rem;
+}
+.external-section .weather-line .temp {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #4ade80;
+  margin-right: .35rem;
+}
+.external-section .quote-line {
+  display: flex;
+  justify-content: space-between;
+  font-size: .85rem;
+  color: #cbd5e1;
+  padding: .15rem 0;
+}
+.external-section .quote-line .var-up { color: #4ade80; }
+.external-section .quote-line .var-down { color: #f87171; }
+.muted { color: #64748b; font-size: .85rem; }
+.credit {
+  display: block;
+  color: #475569;
+  font-size: .68rem;
+  margin-top: .25rem;
+  line-height: 1.4;
+}
+
 @media (max-width: 900px) {
   main { grid-template-columns: 1fr; }
 }
