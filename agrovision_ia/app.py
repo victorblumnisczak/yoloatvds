@@ -22,6 +22,7 @@ from services.scraping.rate_limiter import RateLimiter
 from services.scraping.scraping_service import ScrapingService
 from services.scraping.weather import WeatherSource
 from services.scraping.market import MarketSource
+from services.scraping.news import NewsSource
 import services.monitoring_agent as agent
 import services.ollama_client as ollama_client
 import services.camera_pool as camera_pool
@@ -51,8 +52,9 @@ _weather_source = WeatherSource(
     active_camera_provider=lambda: monitor.status().get("source")
 )
 _market_source = MarketSource()
+_news_source = NewsSource()
 scraping_service = ScrapingService(
-    sources=[_weather_source, _market_source],
+    sources=[_weather_source, _market_source, _news_source],
     cache=_scraping_cache,
     rate_limiter=_rate_limiter,
 )
@@ -123,6 +125,16 @@ def scraping_status():
     if not SCRAPING_ENABLED:
         return {"enabled": False, "sources": [], "cache": {"total": 0, "by_source": {}}}
     return scraping_service.status()
+
+
+@app.get("/scraping/news")
+def scraping_news():
+    if not SCRAPING_ENABLED:
+        return JSONResponse(status_code=503, content={"error": "scraping desabilitado"})
+    result = scraping_service.get("news")
+    if not result:
+        return JSONResponse(status_code=503, content={"error": "indisponível"})
+    return result.payload
 
 
 @app.get("/scraping/market")

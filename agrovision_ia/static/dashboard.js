@@ -134,9 +134,10 @@ setInterval(checkHealth, 30000);
 // --- Condições externas (clima + cotações via scraping) ---
 async function refreshExternal() {
   try {
-    const [wRes, mRes] = await Promise.allSettled([
+    const [wRes, mRes, nRes] = await Promise.allSettled([
       fetch('/scraping/weather'),
       fetch('/scraping/market'),
+      fetch('/scraping/news'),
     ]);
 
     const wEl = document.getElementById('weather-content');
@@ -193,6 +194,33 @@ async function refreshExternal() {
       }
     } else {
       mEl.innerHTML = '<span class="muted">Indisponível.</span>';
+    }
+    const nEl = document.getElementById('news-content');
+    if (nEl) {
+      if (nRes.status === 'fulfilled' && nRes.value.ok) {
+        const n = await nRes.value.json();
+        nEl.innerHTML = '';
+        (n.headlines || []).slice(0, 3).forEach(h => {
+          const row = document.createElement('div');
+          row.className = 'news-line';
+
+          const date = document.createElement('span');
+          date.className = 'news-date';
+          date.textContent = h.date || '';
+
+          const title = document.createElement('span');
+          title.textContent = h.title || '';
+
+          row.appendChild(date);
+          row.appendChild(title);
+          nEl.appendChild(row);
+        });
+        if (!nEl.children.length) {
+          nEl.innerHTML = '<span class="muted">Sem manchetes.</span>';
+        }
+      } else {
+        nEl.innerHTML = '<span class="muted">Indisponível.</span>';
+      }
     }
   } catch (_) {
     document.getElementById('weather-content').innerHTML = '<span class="muted">Erro de rede.</span>';

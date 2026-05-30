@@ -121,6 +121,15 @@ def build_event_context(
                 f"  - {q.get('product')}: R$ {price_str}/{q.get('unit', '?')} {var_str}".rstrip()
             )
 
+    news = external_context.get("news")
+    if news:
+        n = news.payload
+        ext_lines.append(f"[Manchetes agro — {n.get('fonte_credito', 'Embrapa/MAPA')}]")
+        for h in (n.get("headlines") or [])[:3]:
+            date = h.get("date", "?")
+            title = (h.get("title") or "")[:120]
+            ext_lines.append(f"  - {date}: {title}")
+
     ext_lines.append("=== FIM DAS FONTES EXTERNAS ===")
 
     ext_block = "\n".join(ext_lines)

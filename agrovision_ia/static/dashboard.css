@@ -244,6 +244,17 @@ tr:hover td { background: #232a3a; }
 }
 .external-section .quote-line .var-up { color: #4ade80; }
 .external-section .quote-line .var-down { color: #f87171; }
+.external-section .news-line {
+  font-size: .82rem;
+  color: #cbd5e1;
+  padding: .25rem 0;
+  line-height: 1.4;
+}
+.external-section .news-line .news-date {
+  color: #64748b;
+  font-size: .72rem;
+  display: block;
+}
 .muted { color: #64748b; font-size: .85rem; }
 .credit {
   display: block;
