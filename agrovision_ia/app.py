@@ -109,7 +109,8 @@ def cameras():
 
 @app.get("/agent/status")
 def agent_status():
-    return agent.get_status()
+    external = scraping_service.get_full_context() if SCRAPING_ENABLED else None
+    return agent.get_status(external)
 
 
 @app.get("/ollama/status")
@@ -184,7 +185,8 @@ def chat(body: ChatRequest):
     try:
         events = list_events(AGENT_EVENT_LIMIT)
         history = chat_sessions.get(SESSION_ID)
-        answer = agent.ask(body.message, history, events)
+        external = scraping_service.get_full_context() if SCRAPING_ENABLED else None
+        answer = agent.ask(body.message, history, events, external)
         chat_sessions.append(SESSION_ID, "user", body.message)
         chat_sessions.append(SESSION_ID, "assistant", answer)
         return {"answer": answer}
@@ -208,7 +210,8 @@ def chat_stream(body: ChatRequest):
         try:
             events = list_events(AGENT_EVENT_LIMIT)
             history = chat_sessions.get(SESSION_ID)
-            for chunk in agent.ask_stream(body.message, history, events):
+            external = scraping_service.get_full_context() if SCRAPING_ENABLED else None
+            for chunk in agent.ask_stream(body.message, history, events, external):
                 accumulated.append(chunk)
                 yield json.dumps({"chunk": chunk}, ensure_ascii=False) + "\n"
             full_response = "".join(accumulated)

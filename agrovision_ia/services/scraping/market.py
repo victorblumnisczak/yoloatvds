@@ -118,9 +118,11 @@ class MarketSource(ScrapingSource):
                 "Nenhuma cotação extraída — todas as subpáginas falharam ou mudaram estrutura"
             )
 
+        observed_date = quotes[0].get("observed_date") if quotes else None
         payload = {
             "source_url": SOURCE_URL,
             "fonte_credito": "CEPEA/ESALQ-USP via Notícias Agrícolas",
+            "observed_date": observed_date,
             "quotes": quotes,
         }
         log.info("Cotações extraídas: %d produtos", len(quotes))
