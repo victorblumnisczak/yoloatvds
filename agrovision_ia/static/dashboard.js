@@ -132,6 +132,17 @@ checkHealth();
 setInterval(checkHealth, 30000);
 
 // --- Condições externas (clima + cotações via scraping) ---
+
+function weatherIcon(code) {
+  if (code === 0) return '☀️';
+  if (code <= 3) return '⛅';
+  if (code <= 48) return '🌫️';
+  if (code <= 67) return '🌧️';
+  if (code <= 77) return '❄️';
+  if (code <= 82) return '🌦️';
+  return '⛈️';
+}
+
 async function refreshExternal() {
   try {
     const [wRes, mRes, nRes] = await Promise.allSettled([
@@ -140,53 +151,89 @@ async function refreshExternal() {
       fetch('/scraping/news'),
     ]);
 
+    // ---- Clima ----
     const wEl = document.getElementById('weather-content');
     if (wRes.status === 'fulfilled' && wRes.value.ok) {
       const w = await wRes.value.json();
       wEl.innerHTML = '';
-      const line = document.createElement('div');
-      line.className = 'weather-line';
-      const temp = document.createElement('span');
-      temp.className = 'temp';
+
+      const hero = document.createElement('div');
+      hero.className = 'weather-hero';
+
+      const icon = document.createElement('div');
+      icon.className = 'weather-icon';
+      icon.textContent = weatherIcon(w.weather_code || 0);
+
+      const main = document.createElement('div');
+      main.className = 'weather-main';
+
+      const temp = document.createElement('div');
+      temp.className = 'weather-temp';
       temp.textContent = `${Math.round(w.temperature_c ?? 0)}°C`;
-      line.appendChild(temp);
-      line.appendChild(document.createTextNode(
-        `${w.weather_description || ''} — ${w.location || ''} | vento ${Math.round(w.wind_kmh || 0)} km/h`
-      ));
-      wEl.appendChild(line);
+
+      const desc = document.createElement('div');
+      desc.className = 'weather-desc';
+      desc.textContent = `${w.weather_description || ''} · ${w.location || ''}`;
+
+      const meta = document.createElement('div');
+      meta.className = 'weather-meta';
+
+      const wind = document.createElement('span');
+      wind.textContent = `💨 ${Math.round(w.wind_kmh || 0)} km/h`;
+
+      const hum = document.createElement('span');
+      hum.textContent = `💧 ${w.humidity_pct || 0}%`;
+
+      const prec = document.createElement('span');
+      prec.textContent = `🌧 ${w.precipitation_mm || 0} mm`;
+
+      meta.appendChild(wind);
+      meta.appendChild(hum);
+      meta.appendChild(prec);
+      main.appendChild(temp);
+      main.appendChild(desc);
+      main.appendChild(meta);
+      hero.appendChild(icon);
+      hero.appendChild(main);
+      wEl.appendChild(hero);
     } else {
       wEl.innerHTML = '<span class="muted">Indisponível.</span>';
     }
 
+    // ---- Cotações ----
     const mEl = document.getElementById('market-content');
     if (mRes.status === 'fulfilled' && mRes.value.ok) {
       const m = await mRes.value.json();
       mEl.innerHTML = '';
       (m.quotes || []).slice(0, 5).forEach(q => {
         const row = document.createElement('div');
-        row.className = 'quote-line';
+        row.className = 'quote-row';
 
         const name = document.createElement('span');
+        name.className = 'quote-product';
         name.textContent = q.product;
 
-        const val = document.createElement('span');
-        const variation = q.variation_pct;
-        const price = q.price_brl;
-        const priceStr = typeof price === 'number' ? price.toFixed(2) : '?';
+        const price = document.createElement('span');
+        price.className = 'quote-price';
+        const priceStr = typeof q.price_brl === 'number'
+          ? q.price_brl.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})
+          : '?';
+        price.textContent = `R$ ${priceStr}`;
 
-        // Constrói via DOM (não usar innerHTML em dados externos)
-        const priceText = document.createTextNode(`R$ ${priceStr}/${q.unit || ''} `);
-        val.appendChild(priceText);
-
-        if (typeof variation === 'number') {
-          const varSpan = document.createElement('span');
-          varSpan.className = variation >= 0 ? 'var-up' : 'var-down';
-          varSpan.textContent = `(${variation >= 0 ? '+' : ''}${variation.toFixed(1)}%)`;
-          val.appendChild(varSpan);
+        const varEl = document.createElement('span');
+        const v = q.variation_pct;
+        if (typeof v === 'number') {
+          const absVal = Math.abs(v).toFixed(1);
+          varEl.className = 'quote-var ' + (v > 0 ? 'var-up' : v < 0 ? 'var-down' : 'var-flat');
+          varEl.textContent = (v >= 0 ? '+' : '−') + absVal + '%';
+        } else {
+          varEl.className = 'quote-var var-flat';
+          varEl.textContent = '—';
         }
 
         row.appendChild(name);
-        row.appendChild(val);
+        row.appendChild(price);
+        row.appendChild(varEl);
         mEl.appendChild(row);
       });
       if (!mEl.children.length) {
@@ -195,25 +242,28 @@ async function refreshExternal() {
     } else {
       mEl.innerHTML = '<span class="muted">Indisponível.</span>';
     }
+
+    // ---- Manchetes ----
     const nEl = document.getElementById('news-content');
     if (nEl) {
       if (nRes.status === 'fulfilled' && nRes.value.ok) {
         const n = await nRes.value.json();
         nEl.innerHTML = '';
         (n.headlines || []).slice(0, 3).forEach(h => {
-          const row = document.createElement('div');
-          row.className = 'news-line';
+          const item = document.createElement('div');
+          item.className = 'news-item';
 
           const date = document.createElement('span');
           date.className = 'news-date';
           date.textContent = h.date || '';
 
           const title = document.createElement('span');
+          title.className = 'news-title';
           title.textContent = h.title || '';
 
-          row.appendChild(date);
-          row.appendChild(title);
-          nEl.appendChild(row);
+          item.appendChild(date);
+          item.appendChild(title);
+          nEl.appendChild(item);
         });
         if (!nEl.children.length) {
           nEl.innerHTML = '<span class="muted">Sem manchetes.</span>';
